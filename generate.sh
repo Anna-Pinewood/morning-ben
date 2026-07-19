@@ -39,6 +39,22 @@ PYEOF
 )"
 [ -n "$PENDING_TOPICS" ] || PENDING_TOPICS="(пока нет)"
 
+# Обратная связь: свободные сообщения Ольги боту (state/feedback.json).
+# В промпт идут только три самых свежих, с датами.
+FEEDBACK="$(python3 - <<'PYEOF'
+import json
+try:
+    entries = json.load(open("state/feedback.json"))
+except Exception:
+    entries = []
+if isinstance(entries, list):
+    for e in entries[-3:][::-1]:
+        if isinstance(e, dict) and e.get("text"):
+            print(f"- [{e.get('date', '?')}] {e['text']}")
+PYEOF
+)"
+[ -n "$FEEDBACK" ] || FEEDBACK="(пока нет)"
+
 PROMPT="$(sed "s/{{N_STORIES}}/$N/g" generate_stories.md)
 
 ---
@@ -67,6 +83,14 @@ $(cat state/shown_history.json)
 из shown_history:
 
 $PENDING_TOPICS
+
+## Обратная связь от Ольги
+
+Её сообщения боту про то, какие истории она хочет видеть (свежие первыми).
+Это прямые пожелания — учитывай их при выборе тем, тона и формата; свежие
+важнее старых:
+
+$FEEDBACK
 "
 
 echo "=== $(date -Iseconds) generate run start (N=$N) ===" >> logs/generate.log

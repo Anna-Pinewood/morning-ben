@@ -32,12 +32,14 @@ STATE_DIR = BASE_DIR / "state"
 LOGS_DIR = BASE_DIR / "logs"
 USER_STATE_FILE = STATE_DIR / "user_state.json"
 SHOWN_HISTORY_FILE = STATE_DIR / "shown_history.json"
+FEEDBACK_FILE = STATE_DIR / "feedback.json"
 
 BTN_NEXT = "Дальше ▶"
 BTN_SKIP = "Следующая история ⏭"
 DIVIDER = "✨ на сегодня всё по этой теме"
 QUEUE_EMPTY = "Истории на сегодня закончились, увидимся позже 🌙"
 GREETING = "Доброе утро! ☀️ Жми «Дальше ▶» — полистаем."
+FEEDBACK_ACK = "Принял 📝 Учту в следующих историях."
 
 KEYBOARD = ReplyKeyboardMarkup(
     [[BTN_NEXT, BTN_SKIP]], resize_keyboard=True, is_persistent=True
@@ -106,6 +108,14 @@ def log_shown(story: dict, messages_seen: int, completed: bool) -> None:
         }
     )
     _write_json(SHOWN_HISTORY_FILE, history)
+
+
+def log_feedback(text: str) -> None:
+    feedback = _read_json(FEEDBACK_FILE, [])
+    if not isinstance(feedback, list):
+        feedback = []
+    feedback.append({"date": date.today().isoformat(), "text": text})
+    _write_json(FEEDBACK_FILE, feedback)
 
 
 # --- истории ----------------------------------------------------------------
@@ -242,6 +252,12 @@ async def on_skip(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         await on_next(update, context)
 
 
+async def on_feedback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Любой текст, не являющийся командой или кнопкой, — обратная связь генератору."""
+    log_feedback(update.message.text)
+    await send(update, FEEDBACK_ACK, formatted=False)
+
+
 def main() -> None:
     load_dotenv(BASE_DIR / ".env")
     token = os.environ.get("TELEGRAM_BOT_TOKEN")
@@ -268,6 +284,10 @@ def main() -> None:
     )
     app.add_handler(
         MessageHandler(owner & filters.Regex(f"^{re.escape(BTN_SKIP)}$"), on_skip)
+    )
+    # Регистрируется после кнопок: до сюда доходит только «свободный» текст.
+    app.add_handler(
+        MessageHandler(owner & filters.TEXT & ~filters.COMMAND, on_feedback)
     )
 
     logger.info("Morning Ben запущен, слушаю long polling")
