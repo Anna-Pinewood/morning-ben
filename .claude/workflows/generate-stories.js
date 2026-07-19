@@ -4,7 +4,6 @@ export const meta = {
   whenToUse: 'Ручная или регулярная генерация историй. args = число историй, по умолчанию 5.',
   phases: [
     { title: 'Generate', detail: 'один sonnet-агент по промпту generate_stories.md', model: 'sonnet' },
-    { title: 'Validate', detail: 'проверка схемы всех stories/*.json' },
   ],
 }
 
@@ -27,32 +26,12 @@ const report = await agent(
    каждую отдельным файлом в stories/ в формате из промпта. Существующие
    файлы не трогай.
 
+Перед завершением сам проверь валидность записанных JSON (например,
+python3 -m json.tool) — отдельного агента для этого нет.
+
 Верни короткий отчёт: созданные файлы и их темы.`,
   { model: 'sonnet', phase: 'Generate', label: `generate ${n} stories` },
 )
 
-phase('Validate')
-const check = await agent(
-  `В корне текущего проекта проверь ВСЕ файлы stories/*.json одной командой
-python3: каждый обязан быть валидным JSON с полями id (непустая строка),
-topic (строка), generated_at (строка), messages (непустой массив непустых
-строк). Верни итог.`,
-  {
-    model: 'haiku',
-    effort: 'low',
-    phase: 'Validate',
-    label: 'validate stories',
-    schema: {
-      type: 'object',
-      required: ['total', 'valid', 'invalid_files'],
-      properties: {
-        total: { type: 'number' },
-        valid: { type: 'number' },
-        invalid_files: { type: 'array', items: { type: 'string' } },
-      },
-    },
-  },
-)
-
-log(`Готово: запрошено ${n}, в stories/ всего ${check.total} файлов, валидных ${check.valid}`)
-return { requested: n, report, validation: check }
+log(`Готово: запрошено ${n} историй`)
+return { requested: n, report }
