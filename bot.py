@@ -17,7 +17,7 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 from telegram import ReplyKeyboardMarkup, Update
-from telegram.error import BadRequest
+from telegram.error import BadRequest, TelegramError
 from telegram.ext import (
     Application,
     CommandHandler,
@@ -121,6 +121,18 @@ def log_feedback(text: str) -> None:
 # --- истории ----------------------------------------------------------------
 
 
+def _valid_message(m) -> bool:
+    """Сообщение — либо непустой текст, либо картинка {"type": "image", "url": ...}."""
+    if isinstance(m, str):
+        return bool(m.strip())
+    return (
+        isinstance(m, dict)
+        and m.get("type") == "image"
+        and isinstance(m.get("url"), str)
+        and m["url"].startswith("http")
+    )
+
+
 def _valid_story(data) -> bool:
     return (
         isinstance(data, dict)
@@ -128,7 +140,7 @@ def _valid_story(data) -> bool:
         and data["id"]
         and isinstance(data.get("messages"), list)
         and len(data["messages"]) > 0
-        and all(isinstance(m, str) and m.strip() for m in data["messages"])
+        and all(_valid_message(m) for m in data["messages"])
     )
 
 
@@ -193,6 +205,16 @@ async def send(update: Update, text: str, formatted: bool = True, **kwargs) -> N
         await update.message.reply_text(text, **kwargs)
 
 
+async def send_image(update: Update, item: dict) -> bool:
+    """Фото по URL (телеграм сам его скачивает); False — не вышло, пропускаем."""
+    try:
+        await update.message.reply_photo(item["url"])
+        return True
+    except TelegramError:
+        logger.warning("Картинка не отправилась, пропускаю: %s", item["url"])
+        return False
+
+
 # --- механика ---------------------------------------------------------------
 
 
@@ -230,8 +252,15 @@ async def on_next(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         state = {"current_story_id": story["id"], "current_message_index": 0}
 
     idx = state["current_message_index"]
-    await send(update, story["messages"][idx])
-    idx += 1
+    while idx < len(story["messages"]):
+        item = story["messages"][idx]
+        idx += 1
+        if isinstance(item, str):
+            await send(update, item)
+            break
+        if await send_image(update, item):
+            break
+        # Картинка не отправилась — без лишних слов показываем следующее.
     write_user_state(story["id"], idx)
 
     if idx >= len(story["messages"]):

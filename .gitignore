@@ -5,6 +5,9 @@ stories/
 state/
 logs/
 
+# сторонний mcp-pinterest (ставится setup_pinterest.sh)
+vendor/
+
 # python
 .venv/
 __pycache__/

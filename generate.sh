@@ -20,6 +20,21 @@ esac
 mkdir -p stories state logs
 [ -f state/shown_history.json ] || echo "[]" > state/shown_history.json
 
+# Pinterest MCP (картинки в историях): на Linux у Chrome нестандартный путь
+# и библиотеки в userspace (см. setup_pinterest.sh) — прокидываем через env,
+# они дойдут до Chrome сквозь claude → MCP-сервер → puppeteer.
+PINTEREST_MCP_ARGS=()
+if [ -f vendor/mcp-pinterest/dist/pinterest-mcp-server.js ]; then
+  PINTEREST_MCP_ARGS=(--mcp-config .mcp.json --strict-mcp-config)
+  if [ "$(uname)" = "Linux" ]; then
+    CHROME_BIN="$(ls -d "$HOME"/.cache/puppeteer/chrome/*/chrome-linux64/chrome 2>/dev/null | head -1 || true)"
+    [ -n "$CHROME_BIN" ] && export MCP_PINTEREST_CHROME_PATH="$CHROME_BIN"
+    [ -d "$HOME/chrome-libs" ] && export LD_LIBRARY_PATH="$HOME/chrome-libs/usr/lib/x86_64-linux-gnu:$HOME/chrome-libs/lib/x86_64-linux-gnu${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+  fi
+else
+  echo "ВНИМАНИЕ: vendor/mcp-pinterest не собран (./setup_pinterest.sh) — истории будут без картинок" >&2
+fi
+
 # Темы историй, которые уже лежат в очереди, но ещё не показаны —
 # их тоже нельзя повторять, иначе подряд выпадут две истории об одном.
 PENDING_TOPICS="$(python3 - <<'PYEOF'
@@ -98,6 +113,7 @@ set +e
 claude -p "$PROMPT" \
   --model sonnet \
   --dangerously-skip-permissions \
+  ${PINTEREST_MCP_ARGS+"${PINTEREST_MCP_ARGS[@]}"} \
   >> logs/generate.log 2>&1
 rc=$?
 set -e

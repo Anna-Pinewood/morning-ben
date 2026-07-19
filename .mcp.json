@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "pinterest": {
+      "command": "node",
+      "args": ["vendor/mcp-pinterest/dist/pinterest-mcp-server.js"]
+    }
+  }
+}
