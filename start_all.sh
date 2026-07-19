@@ -1,9 +1,8 @@
 #!/usr/bin/env bash
 # Morning Ben — поднять всё одной командой (например, после перезагрузки
-# сервера). Создаёт tmux-сессию morning-ben с тремя окнами:
+# сервера). Создаёт tmux-сессию morning-ben с двумя окнами:
 #   0 bot     — телеграм-бот (uv run bot.py)
-#   1 watcher — авто-пополнение очереди (watch_stories.sh)
-#   2 nightly — ночной прогон в 21:03 мск (nightly_generate.sh 20)
+#   1 watcher — генерация: держит очередь непоказанных не ниже порога
 # Каждое окно обёрнуто в перезапускающий цикл — упавший процесс поднимется
 # сам через 5 секунд.
 set -euo pipefail
@@ -25,7 +24,5 @@ tmux new-session  -d -s "$SESSION" -n bot \
   "while true; do uv run bot.py; echo 'бот упал, перезапуск через 5с'; sleep 5; done"
 tmux new-window -t "$SESSION" -n watcher \
   "while true; do ./watch_stories.sh 2>&1 | tee -a logs/watcher.log; sleep 5; done"
-tmux new-window -t "$SESSION" -n nightly \
-  "while true; do ./nightly_generate.sh 20 2>&1 | tee -a logs/nightly.log; sleep 5; done"
 
-echo "Запущено. Окна: tmux attach -t $SESSION (Ctrl-b 0/1/2 — окна, Ctrl-b d — выйти)"
+echo "Запущено. Окна: tmux attach -t $SESSION (Ctrl-b 0/1 — окна, Ctrl-b d — выйти)"
